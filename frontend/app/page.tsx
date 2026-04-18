@@ -2,7 +2,6 @@ import { api } from "@/lib/api";
 import { PatientCard } from "@/components/PatientCard";
 import { AlertFeed } from "@/components/AlertFeed";
 import { ConvaiWidget } from "@/components/ConvaiWidget";
-import { FinalizeButton } from "@/components/FinalizeButton";
 
 export const revalidate = 0;
 
@@ -22,7 +21,6 @@ export default async function Dashboard() {
           </div>
         </div>
         <ConvaiWidget agentId={agentId} />
-        <FinalizeButton />
       </section>
       <aside>
         <h2 className="mb-2 text-lg font-semibold">Recent alerts</h2>
