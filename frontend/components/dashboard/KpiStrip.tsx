@@ -1,0 +1,202 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { Glass } from "@/components/ui/Glass";
+import { api, type Alert, type Patient } from "@/lib/api";
+import { usePolling } from "@/lib/hooks/usePolling";
+
+type Tile = {
+  label: string;
+  value: string;
+  hint?: string;
+  accent: string;
+  icon: React.ReactNode;
+};
+
+function isToday(iso: string | null | undefined): boolean {
+  if (!iso) return false;
+  const d = new Date(iso);
+  const now = new Date();
+  return (
+    d.getFullYear() === now.getFullYear() &&
+    d.getMonth() === now.getMonth() &&
+    d.getDate() === now.getDate()
+  );
+}
+
+function Tile({ tile }: { tile: Tile }) {
+  return (
+    <Glass className="group relative overflow-hidden p-4">
+      <div
+        aria-hidden
+        className="pointer-events-none absolute -right-8 -top-8 h-24 w-24 rounded-full opacity-30 blur-2xl transition-opacity group-hover:opacity-60"
+        style={{ background: tile.accent }}
+      />
+      <div className="flex items-start justify-between">
+        <div className="text-[11px] font-medium uppercase tracking-wider text-slate-400">
+          {tile.label}
+        </div>
+        <div
+          className="grid h-7 w-7 place-items-center rounded-lg text-white"
+          style={{
+            background: `linear-gradient(135deg, ${tile.accent} 0%, transparent 120%)`,
+            boxShadow: `inset 0 1px 0 rgba(255,255,255,0.15)`,
+          }}
+        >
+          {tile.icon}
+        </div>
+      </div>
+      <div className="num mt-2 text-[28px] font-semibold leading-none tracking-tight text-white text-on-glass">
+        {tile.value}
+      </div>
+      {tile.hint && (
+        <div className="mt-1.5 text-[11px] text-slate-400">{tile.hint}</div>
+      )}
+    </Glass>
+  );
+}
+
+export function KpiStrip({
+  initialPatients,
+  initialAlerts,
+  initialAvgDeterioration,
+}: {
+  initialPatients: Patient[];
+  initialAlerts?: Alert[];
+  initialAvgDeterioration?: number | null;
+}) {
+  const { data: patients } = usePolling<Patient[]>(
+    api.patients,
+    10_000,
+    initialPatients
+  );
+  const { data: alerts } = usePolling<Alert[]>(
+    api.alerts,
+    5_000,
+    initialAlerts ?? []
+  );
+
+  const ps = patients ?? initialPatients ?? [];
+  const as = alerts ?? initialAlerts ?? [];
+
+  const [avg, setAvg] = useState<number | null>(initialAvgDeterioration ?? null);
+
+  useEffect(() => {
+    let alive = true;
+    const tick = async () => {
+      try {
+        const lasts = await Promise.all(
+          ps.map(async (p) => {
+            try {
+              const cs = await api.calls(p.id);
+              const last = cs[cs.length - 1];
+              return last?.score?.deterioration ?? null;
+            } catch {
+              return null;
+            }
+          })
+        );
+        const valid = lasts.filter((v): v is number => typeof v === "number");
+        if (alive) {
+          setAvg(valid.length ? valid.reduce((a, b) => a + b, 0) / valid.length : null);
+        }
+      } catch {
+        /* noop */
+      }
+    };
+    tick();
+    const id = setInterval(tick, 12_000);
+    return () => {
+      alive = false;
+      clearInterval(id);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ps.map((p) => p.id).join(",")]);
+
+  const callsToday = ps.reduce(
+    (acc, p) => acc + (isToday(p.next_call_at) ? 1 : 0),
+    0
+  );
+  const open = as.length;
+  const crit = as.filter((a) => a.severity === "suggest_911").length;
+
+  const tiles: Tile[] = [
+    {
+      label: "Active patients",
+      value: ps.length.toString().padStart(2, "0"),
+      hint: ps.length === 1 ? "1 enrolled" : `${ps.length} enrolled`,
+      accent: "rgba(96,165,250,0.55)",
+      icon: (
+        <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4">
+          <path
+            d="M12 12a4 4 0 100-8 4 4 0 000 8zm0 2c-3.5 0-8 1.8-8 5v2h16v-2c0-3.2-4.5-5-8-5z"
+            fill="currentColor"
+          />
+        </svg>
+      ),
+    },
+    {
+      label: "Calls due today",
+      value: callsToday.toString().padStart(2, "0"),
+      hint: "Auto-scheduled",
+      accent: "rgba(99,102,241,0.55)",
+      icon: (
+        <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4">
+          <path
+            d="M6.6 10.8a15 15 0 006.6 6.6l2.2-2.2a1 1 0 011-.25 11.4 11.4 0 003.6.6 1 1 0 011 1V20a1 1 0 01-1 1A17 17 0 013 4a1 1 0 011-1h3.5a1 1 0 011 1 11.4 11.4 0 00.6 3.6 1 1 0 01-.25 1l-2.25 2.2z"
+            fill="currentColor"
+          />
+        </svg>
+      ),
+    },
+    {
+      label: "Open alerts",
+      value: open.toString().padStart(2, "0"),
+      hint: crit ? `${crit} critical` : "None critical",
+      accent:
+        crit > 0
+          ? "rgba(244,63,94,0.6)"
+          : open > 0
+          ? "rgba(251,146,60,0.55)"
+          : "rgba(52,211,153,0.5)",
+      icon: (
+        <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4">
+          <path
+            d="M12 22a2 2 0 002-2h-4a2 2 0 002 2zm6-6V11a6 6 0 10-12 0v5l-2 2v1h16v-1l-2-2z"
+            fill="currentColor"
+          />
+        </svg>
+      ),
+    },
+    {
+      label: "Avg deterioration",
+      value: avg != null ? avg.toFixed(2) : "—",
+      hint: avg != null ? "Across active patients" : "No scored calls yet",
+      accent:
+        avg != null && avg >= 0.6
+          ? "rgba(244,63,94,0.55)"
+          : avg != null && avg >= 0.3
+          ? "rgba(251,191,36,0.55)"
+          : "rgba(34,211,238,0.55)",
+      icon: (
+        <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4">
+          <path
+            d="M3 17l5-5 4 4 8-8M21 8h-5M21 8v5"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+      ),
+    },
+  ];
+
+  return (
+    <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
+      {tiles.map((t) => (
+        <Tile key={t.label} tile={t} />
+      ))}
+    </div>
+  );
+}

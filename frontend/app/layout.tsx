@@ -1,22 +1,30 @@
 import "./globals.css";
+import { Inter } from "next/font/google";
+import { Aurora } from "@/components/shell/Aurora";
+import { AppShell } from "@/components/shell/AppShell";
 
-export const metadata = { title: "Sentinel" };
+const inter = Inter({
+  subsets: ["latin"],
+  variable: "--font-inter",
+  display: "swap",
+});
+
+export const metadata = {
+  title: "Sentinel — Post-op Monitor",
+  description:
+    "AI voice-nurse monitoring for post-operative patients. Catches deterioration before it becomes a 911 call.",
+};
 
 export default function RootLayout({
   children,
-}: { children: React.ReactNode }) {
+}: {
+  children: React.ReactNode;
+}) {
   return (
-    <html lang="en">
-      <body>
-        <div className="mx-auto max-w-6xl p-6">
-          <header className="mb-6 flex items-baseline justify-between">
-            <h1 className="text-2xl font-bold">Sentinel</h1>
-            <span className="text-sm text-slate-400">
-              Post-op deterioration monitor
-            </span>
-          </header>
-          {children}
-        </div>
+    <html lang="en" className={inter.variable}>
+      <body className="font-sans">
+        <Aurora />
+        <AppShell>{children}</AppShell>
       </body>
     </html>
   );
