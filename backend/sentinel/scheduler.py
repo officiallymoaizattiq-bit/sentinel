@@ -49,6 +49,13 @@ def start() -> AsyncIOScheduler:
         id="sentinel_audit",
         replace_existing=True,
     )
+    _sched.add_job(
+        lambda: asyncio.create_task(_run_auto_finalize()),
+        trigger="interval",
+        seconds=30,
+        id="sentinel_auto_finalize",
+        replace_existing=True,
+    )
     _sched.start()
     return _sched
 
@@ -79,3 +86,60 @@ async def _run_audit() -> None:
     missing = await audit_missing_escalations()
     if missing:
         log.error("escalation missing for calls: %s", missing)
+
+
+async def auto_finalize_conversations() -> list[str]:
+    """Poll ElevenLabs for finished conversations + score any we haven't yet.
+
+    Looks up conversations for the configured agent in the last 2 hours.
+    For each status=done conversation not already scored in Mongo, call
+    finalize_call() with the most recently enrolled patient as the fallback
+    patient_id (widget path — no prior call doc exists).
+    """
+    from sentinel.call_handler import finalize_call
+    from sentinel.config import get_settings
+
+    s = get_settings()
+    if not s.elevenlabs_api_key or not s.elevenlabs_agent_id:
+        return []
+
+    try:
+        from elevenlabs.client import ElevenLabs
+        el = ElevenLabs(api_key=s.elevenlabs_api_key)
+        since = int((datetime.now(tz=timezone.utc) - timedelta(hours=2)).timestamp())
+        page = el.conversational_ai.conversations.list(
+            agent_id=s.elevenlabs_agent_id,
+            call_start_after_unix=since,
+            page_size=20,
+        )
+    except Exception as e:
+        log.warning("auto_finalize: EL list failed: %s", e)
+        return []
+
+    db = get_db()
+    finalized: list[str] = []
+    latest_patient = await db.patients.find({}).sort("_id", -1).limit(1).to_list(1)
+    fallback_pid = latest_patient[0]["_id"] if latest_patient else None
+
+    for convo in getattr(page, "conversations", []) or []:
+        cid = getattr(convo, "conversation_id", None)
+        status = getattr(convo, "status", None)
+        if not cid or status != "done":
+            continue
+        existing = await db.calls.find_one({
+            "conversation_id": cid, "status": "scored",
+        })
+        if existing is not None:
+            continue
+        try:
+            await finalize_call(conversation_id=cid, patient_id_fallback=fallback_pid)
+            finalized.append(cid)
+        except Exception as e:
+            log.warning("auto_finalize: finalize_call(%s) failed: %s", cid, e)
+    return finalized
+
+
+async def _run_auto_finalize() -> None:
+    done = await auto_finalize_conversations()
+    if done:
+        log.info("auto-finalized %d conversations", len(done))
