@@ -1,0 +1,11 @@
+import os
+os.environ.setdefault("MONGO_URI", "mongodb://localhost:27017")
+os.environ.setdefault("MONGO_DB", "sentinel_test")
+os.environ.setdefault("GEMINI_API_KEY", "test")
+os.environ.setdefault("ELEVENLABS_API_KEY", "test")
+os.environ.setdefault("ELEVENLABS_AGENT_ID", "agent_test")
+os.environ.setdefault("TWILIO_ACCOUNT_SID", "AC_test")
+os.environ.setdefault("TWILIO_AUTH_TOKEN", "test")
+os.environ.setdefault("TWILIO_FROM_NUMBER", "+15555550100")
+os.environ.setdefault("PUBLIC_BASE_URL", "http://localhost:8000")
+os.environ.setdefault("DEMO_MODE", "true")
