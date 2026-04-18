@@ -175,3 +175,12 @@ async def twilio_media_stream(ws: WebSocket):
         )
     finally:
         reader_task.cancel()
+
+
+from sentinel.demo_runner import run_trajectory_demo
+
+
+@router.post("/demo/run")
+async def demo_run():
+    pid = await run_trajectory_demo()
+    return {"patient_id": pid}
