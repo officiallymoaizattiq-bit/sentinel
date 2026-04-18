@@ -126,7 +126,14 @@ async def auto_finalize_conversations() -> list[str]:
     for convo in getattr(page, "conversations", []) or []:
         cid = getattr(convo, "conversation_id", None)
         status = getattr(convo, "status", None)
-        if not cid or status != "done":
+        dur = getattr(convo, "call_duration_secs", 0) or 0
+        if not cid:
+            continue
+        if status == "failed":
+            log.warning("EL convo %s failed (duration=%ds) — widget connection issue",
+                        cid, dur)
+            continue
+        if status != "done":
             continue
         existing = await db.calls.find_one({
             "conversation_id": cid, "status": "scored",
