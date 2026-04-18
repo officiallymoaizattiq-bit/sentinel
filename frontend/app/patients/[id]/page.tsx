@@ -1,6 +1,7 @@
 import { api } from "@/lib/api";
 import { TrajectoryChart } from "@/components/TrajectoryChart";
 import { CohortPanel } from "@/components/CohortPanel";
+import { VitalsPanel } from "@/components/VitalsPanel";
 
 export const revalidate = 0;
 
@@ -51,6 +52,11 @@ export default async function PatientDetail({
           </div>
         </section>
       )}
+
+      <section>
+        <h3 className="mb-2 text-sm text-slate-400">Wearable vitals (24h)</h3>
+        <VitalsPanel patientId={params.id} />
+      </section>
 
       <section>
         <CohortPanel last={last} />

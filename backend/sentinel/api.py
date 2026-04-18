@@ -230,3 +230,25 @@ async def vitals_batch(
     status = 200 if result.get("idempotent_replay") else 202
     return Response(content=json.dumps(result),
                     media_type="application/json", status_code=status)
+
+
+@router.get("/patients/{pid}/vitals")
+async def patient_vitals(pid: str, hours: int = 2):
+    from datetime import datetime, timedelta, timezone
+    cutoff = datetime.now(tz=timezone.utc) - timedelta(hours=hours)
+    cur = (
+        get_db()
+        .vitals.find({"patient_id": pid, "t": {"$gte": cutoff}})
+        .sort("t", 1)
+    )
+    return [
+        {
+            "t": d["t"].isoformat() if hasattr(d["t"], "isoformat") else d["t"],
+            "kind": d["kind"],
+            "value": d["value"],
+            "unit": d["unit"],
+            "source": d["source"],
+            "clock_skew": d.get("clock_skew", False),
+        }
+        async for d in cur
+    ]
