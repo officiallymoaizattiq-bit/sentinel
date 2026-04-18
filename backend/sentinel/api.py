@@ -2,10 +2,12 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Form, HTTPException, Response
 from pydantic import BaseModel
+from twilio.twiml.voice_response import VoiceResponse as TwilioVoiceResponse
 
 from sentinel import enrollment
+from sentinel.call_handler import build_check_in_twiml
 from sentinel.db import get_db
 from sentinel.models import Caregiver, Consent, SurgeryType
 
@@ -90,3 +92,35 @@ async def list_alerts():
         }
         async for d in cur
     ]
+
+
+@router.get("/calls/twiml")
+async def twiml_for_call(patient_id: str):
+    patient = await get_db().patients.find_one({"_id": patient_id})
+    name = (patient or {}).get("name", "there")
+    xml = build_check_in_twiml(
+        patient_name=name,
+        action_url=f"/api/calls/gather?patient_id={patient_id}",
+    )
+    return Response(content=xml, media_type="application/xml")
+
+
+@router.post("/calls/gather")
+async def twiml_gather(patient_id: str, SpeechResult: str = Form("")):
+    from uuid import uuid4
+    call_id = str(uuid4())
+    await get_db().calls.insert_one({
+        "_id": call_id,
+        "patient_id": patient_id,
+        "called_at": datetime.utcnow(),
+        "transcript": [
+            {"role": "patient", "text": SpeechResult,
+             "t_start": 0.0, "t_end": 10.0}
+        ],
+        "score": None, "similar_calls": [], "embedding": [],
+        "audio_features": {}, "baseline_drift": {},
+        "llm_degraded": False, "audio_degraded": True, "short_call": True,
+    })
+    resp = TwilioVoiceResponse()
+    resp.say("Thank you. A nurse will review your check-in. Goodbye.")
+    return Response(content=str(resp), media_type="application/xml")
