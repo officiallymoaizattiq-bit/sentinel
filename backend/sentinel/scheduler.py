@@ -28,34 +28,36 @@ async def tick() -> None:
 
 
 _sched: AsyncIOScheduler | None = None
+_loop: asyncio.AbstractEventLoop | None = None
+
+
+def _run_coro(coro_fn):
+    """Submit an async callable onto the captured event loop.
+    APScheduler job bodies run in its thread-pool executor — no loop — so we
+    submit via run_coroutine_threadsafe on the loop captured in start().
+    """
+    def _wrap() -> None:
+        if _loop is None or _loop.is_closed():
+            return
+        asyncio.run_coroutine_threadsafe(coro_fn(), _loop)
+    return _wrap
 
 
 def start() -> AsyncIOScheduler:
-    global _sched
+    global _sched, _loop
     if _sched is not None:
         return _sched
+    try:
+        _loop = asyncio.get_running_loop()
+    except RuntimeError:
+        _loop = asyncio.new_event_loop()
     _sched = AsyncIOScheduler()
-    _sched.add_job(
-        lambda: asyncio.create_task(tick()),
-        trigger="interval",
-        seconds=60,
-        id="sentinel_tick",
-        replace_existing=True,
-    )
-    _sched.add_job(
-        lambda: asyncio.create_task(_run_audit()),
-        trigger="interval",
-        seconds=300,
-        id="sentinel_audit",
-        replace_existing=True,
-    )
-    _sched.add_job(
-        lambda: asyncio.create_task(_run_auto_finalize()),
-        trigger="interval",
-        seconds=30,
-        id="sentinel_auto_finalize",
-        replace_existing=True,
-    )
+    _sched.add_job(_run_coro(tick), trigger="interval", seconds=60,
+                   id="sentinel_tick", replace_existing=True)
+    _sched.add_job(_run_coro(_run_audit), trigger="interval", seconds=300,
+                   id="sentinel_audit", replace_existing=True)
+    _sched.add_job(_run_coro(_run_auto_finalize), trigger="interval", seconds=30,
+                   id="sentinel_auto_finalize", replace_existing=True)
     _sched.start()
     return _sched
 
