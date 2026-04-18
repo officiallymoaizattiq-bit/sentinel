@@ -1,0 +1,5 @@
+patient 0.0 2.6 I'm a bit... out of breath climbing the stairs, but I'm fine.
+agent 2.7 4.0 Any fever or chills?
+patient 4.1 6.8 Maybe a little warm, I didn't take my temperature.
+agent 6.9 8.1 How is your pain?
+patient 8.2 11.0 It's worse around the incision today, maybe a six out of ten.

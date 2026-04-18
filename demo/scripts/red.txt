@@ -1,0 +1,5 @@
+patient 0.0 3.1 I'm... I can't really catch my breath. Feels tight in my chest.
+agent 3.2 4.4 Are you able to speak in full sentences?
+patient 4.5 7.8 It's hard. I'm a little confused, I slept on the floor last night.
+agent 7.9 9.0 Do you have fever?
+patient 9.1 12.2 Yes. I think so. I'm shaky.

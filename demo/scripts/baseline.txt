@@ -1,0 +1,5 @@
+patient 0.0 1.8 I'm doing okay, incision is sore but I'm eating and walking.
+agent 1.9 3.4 Any shortness of breath or fevers today?
+patient 3.5 5.8 No fevers, I'm breathing fine, a little tired though.
+agent 5.9 7.2 Urine looking normal?
+patient 7.3 9.4 Yes, normal. I took my meds on time.
