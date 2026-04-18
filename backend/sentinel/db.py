@@ -10,7 +10,7 @@ def get_db() -> AsyncIOMotorDatabase:
     global _client
     s = get_settings()
     if _client is None:
-        _client = AsyncIOMotorClient(s.mongo_uri)
+        _client = AsyncIOMotorClient(s.mongo_uri, serverSelectionTimeoutMS=3000)
     return _client[s.mongo_db]
 
 
