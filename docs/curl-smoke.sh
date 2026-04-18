@@ -59,20 +59,21 @@ echo "replay status=$STATUS"
 [ "$STATUS" = "200" ] || { echo "FAIL: expected 200"; exit 1; }
 
 echo "== 6. Send 1001 samples - expect 413 =="
-python3 - <<PY >/tmp/big.json
-import json, uuid
+BIG_BATCH=$(python3 -c 'import uuid;print(uuid.uuid4())')
+python3 - "$PID" "$DEVICE" "$BIG_BATCH" <<'PY' >/tmp/big.json
+import json, sys
 from datetime import datetime, timezone
-bid = str(uuid.uuid4())
+pid, did, bid = sys.argv[1], sys.argv[2], sys.argv[3]
 now = datetime.now(tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 print(json.dumps({
-    "patient_id": "$PID", "device_id": "$DEVICE", "batch_id": bid,
+    "patient_id": pid, "device_id": did, "batch_id": bid,
     "samples": [{"t": now, "kind": "heart_rate", "value": 72,
                  "unit": "bpm", "source": "apple_healthkit", "confidence": None}] * 1001
 }))
 PY
 STATUS=$(curl -s -o /dev/null -w '%{http_code}' -X POST "$BASE/api/vitals/batch" \
   -H "Authorization: Bearer $TOKEN" \
-  -H "Idempotency-Key: $(python3 -c 'import uuid;print(uuid.uuid4())')" \
+  -H "Idempotency-Key: $BIG_BATCH" \
   -H 'content-type: application/json' --data-binary @/tmp/big.json)
 echo "413 check status=$STATUS"
 [ "$STATUS" = "413" ] || { echo "FAIL: expected 413"; exit 1; }
